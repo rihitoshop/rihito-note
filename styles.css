@@ -604,3 +604,70 @@ textarea.input { min-height: 90px; resize: vertical; }
 .mixgo { margin-top: 12px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
 .mixsw { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; }
 #pal,#thg{max-height:none;overflow:visible}
+
+/* ===== v3.3 mismos formatos, colores combinados: superficies grafito neutras + un solo color de acento ===== */
+:root {
+  --acc: hsl(calc(var(--hue) + 2.7) calc(88% * min(1, var(--sat) + .15)) max(56%, calc(64% * var(--lum))));
+  --neon: var(--acc);
+  --line: color-mix(in srgb, var(--acc) 62%, #000);
+  --bg: #050506; --bg2: #0b0b0d; --card: #111114; --card2: #18181c;
+  --text: #fff; --muted: #a1a1aa; --bsat: 0;
+}
+html, body, #app { background: #050506; }
+.panel, .group, .pcard2, .stats-box, .stat, .fcard, .sheet, .input, .thm, .switch, .pcard {
+  background: var(--card) !important; border-color: var(--line);
+}
+/* mosaicos: misma forma, interior grafito y solo el borde/rayas llevan color */
+.tile, .quick button, .welcome {
+  background:
+    linear-gradient(135deg, transparent 0 13px, var(--acc) 13px 14.8px, transparent 14.8px 18px, color-mix(in srgb, var(--acc) 65%, #000) 18px 19.6px, transparent 19.2px) 0 0 / 30px 30px no-repeat,
+    linear-gradient(180deg, #1b1b20, #0c0c0f);
+}
+.quick button { background:
+    linear-gradient(135deg, transparent 0 9px, var(--acc) 9px 10.4px, transparent 10.4px 13px, color-mix(in srgb, var(--acc) 65%, #000) 13px 14.4px, transparent 14px) 0 0 / 22px 22px no-repeat,
+    linear-gradient(180deg, #1b1b20, #0c0c0f); }
+.tile::after, .quick button::after, .welcome::after { background: linear-gradient(135deg, color-mix(in srgb, var(--acc) 70%, #fff) 0%, var(--acc) 30%, color-mix(in srgb, var(--acc) 70%, #000) 60%, var(--acc) 100%); }
+.tile::before, .welcome::before { background: linear-gradient(135deg, transparent 0 22px, color-mix(in srgb, var(--acc) 70%, #000) 22px 25px, transparent 25px 27.5px, var(--acc) 27.5px 30.5px, transparent 30.5px 33px, color-mix(in srgb, var(--acc) 70%, #fff) 33px 36px); }
+.welcome::before { background: linear-gradient(135deg, transparent 0 17px, color-mix(in srgb, var(--acc) 70%, #000) 17px 19.5px, transparent 19.5px 22px, var(--acc) 22px 24.5px, transparent 24.5px 27px, color-mix(in srgb, var(--acc) 70%, #fff) 27px 30px); }
+.tile .ico, .quick button .ico, .welcome > .ico { color: var(--acc); }
+/* botones */
+.btn:not(.ghost):not(.dashed):not(.danger):not(.dangerline), .iconbtn.sq {
+  background: linear-gradient(180deg, var(--acc), color-mix(in srgb, var(--acc) 80%, #000)); border: 0; color: #08080a;
+}
+.btn.ghost, .btn.dashed { border-color: var(--acc); }
+/* menú de abajo */
+.nav { background: linear-gradient(180deg, #131316, #08080a); }
+.nav::before { background: linear-gradient(90deg, transparent, var(--acc) 15%, color-mix(in srgb, var(--acc) 60%, #fff) 50%, var(--acc) 85%, transparent); }
+.nav button.on, .nav button.on .ico { color: var(--acc); }
+.prow .pi { background: color-mix(in srgb, var(--acc) 16%, #000); color: var(--acc); }
+.stat b { color: var(--acc); }
+/* calculadora */
+.ck:not(.op) { background: linear-gradient(180deg, #1d1d22, #0c0c0f); border: 1.5px solid var(--line); }
+.calc-main #cv .o { color: var(--acc); }
+
+/* letras y números siempre blancos */
+.sec, .sec span, .stat b, .stat span, .card h3, .pcard span, .pcard h2, .offer .act.ed, .lock .link, .welcome, .welcome b, .backup-note, .backup-note.warn,
+.nav button.on, .tile, .quick button, .calc-main #cv, .calc-main #cv .o, .calc-prev, .stats-box .r .val, .prow .pt b, .prow .pt small { color: #fff; }
+.sec, .stat span, .prow .pt small, .nav button:not(.on) { color: #fff; }
+.prow .pt small, .stat span, .nav button:not(.on) { opacity: .72; }
+.calc-prev { opacity: .8; }
+
+/* v3.4 ventas, papelera, fijadas, huella */
+.pinb { display: inline-block; vertical-align: -3px; margin-right: 5px; color: var(--acc, var(--neon)); }
+.pinb .ico { width: 16px; height: 16px; }
+.tact { display: flex; flex-direction: column; gap: 6px; flex: none; }
+.tact .btn { min-height: 36px; padding: 6px 10px; font-size: 14px; width: auto; }
+.salestat .stat i { display: block; font-style: normal; font-size: 11.5px; opacity: .6; margin-top: 2px; }
+.scard { display: flex; align-items: center; gap: 12px; padding: 12px 8px 12px 14px; margin-bottom: 10px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); }
+.scard .sico { color: var(--acc); flex: none; }
+.scard .sico .ico { width: 30px; height: 30px; }
+.scard .smid { flex: 1; min-width: 0; }
+.scard .smid b { display: block; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scard .smid span { display: block; font-size: 14px; opacity: .8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scard .smid small { font-size: 12px; opacity: .55; }
+.scard .sp { font-weight: 800; font-size: 17px; flex: none; }
+.sform { gap: 8px; }
+select.input { appearance: none; -webkit-appearance: none; }
+.fpbtn { margin-top: 14px; width: auto; display: inline-flex; }
+.lock .fpbtn { align-self: center; }
+.sform { align-items: start; } .sform .field { margin: 0; min-width: 0; } .sform .input { padding-left: 10px; padding-right: 10px; }

@@ -2,7 +2,7 @@
    Sólo guarda en caché los ARCHIVOS de la app (para que abra sin internet).
    Tus notas y ofertas NO están aquí: viven en el almacenamiento del teléfono (localStorage),
    así que actualizar la app nunca las borra. */
-const CACHE = 'rihito-notes-v24';
+const CACHE = 'rihito-notes-v26';
 const FILES = [
   './',
   './index.html',

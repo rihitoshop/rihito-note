@@ -24,6 +24,9 @@ const timeStr = t => { const d = new Date(t); return `${pad(d.getHours())}:${pad
 const DATA_KEY = 'rihitonotes.data.v1';
 const PREV_KEY = 'rihitonotes.data.prev';
 const AUTH_KEY = 'rihitonotes.auth.v1';
+const FP_KEY = 'rihitonotes.fp.v1';
+const FIRST_KEY = 'rihitonotes.first';
+const SNOOZE_KEY = 'rihitonotes.remind';
 
 const mem = {};
 const store = {
@@ -101,7 +104,7 @@ function applyTheme() {
   const p = S.profile || {}, th = themeOf(p), fo = FONTS.find(x => x.id === p.font) || FONTS[0];
   const st = document.documentElement.style;
   st.setProperty('--hue', th.hue); st.setProperty('--sat', th.sat); st.setProperty('--lum', th.lum);
-  st.setProperty('--bsat', p.bg === 'black' ? 0 : .14);
+  st.setProperty('--bsat', 0);
   loadFonts([fo]); st.setProperty('--font', fo.css);
   document.documentElement.classList.toggle('bold', !!p.bold);
   const m = document.querySelector('meta[name=theme-color]');
@@ -142,6 +145,8 @@ function defaultData() {
       ]
     }],
     notes: [],
+    trash: [],
+    sales: [],
     meta: { lastBackup: null }
   };
 }
@@ -163,16 +168,26 @@ function normalize(d) {
       }))
     });
   });
-  d.notes.forEach((n, i) => {
-    if (!n || typeof n !== 'object') return;
-    out.notes.push({
+  const normNote = (n, i, inTrash) => {
+    if (!n || typeof n !== 'object') return null;
+    return {
       id: String(n.id || uid()), title: String(n.title || '').slice(0, 120), body: String(n.body || '').slice(0, 100000),
       bg: /^#[0-9a-f]{6}$/i.test(n.bg) ? n.bg : DEF_BG, fg: /^#[0-9a-f]{6}$/i.test(n.fg) ? n.fg : DEF_FG,
       accent: /^#[0-9a-f]{6}$/i.test(n.accent) ? n.accent : ACCENTS[i % ACCENTS.length],
       created: Number(n.created) || Date.now(), updated: Number(n.updated) || Date.now(),
+      ...(n.pinned ? { pinned: true } : {}),
+      ...(inTrash ? { deletedAt: Number(n.deletedAt) || Date.now() } : {}),
       ...(n.type === 'calc' ? { type: 'calc', lines: cleanLines(n.lines) } : {})
-    });
-  });
+    };
+  };
+  d.notes.forEach((n, i) => { const x = normNote(n, i, false); if (x) out.notes.push(x); });
+  out.trash = (Array.isArray(d.trash) ? d.trash : []).slice(0, 500).map((n, i) => normNote(n, i, true)).filter(Boolean);
+  const nn = (v, def) => (Number.isFinite(+v) ? +v : def);
+  out.sales = (Array.isArray(d.sales) ? d.sales : []).slice(0, 20000).filter(x => x && typeof x === 'object').map(x => ({
+    id: String(x.id || uid()), client: String(x.client || '').slice(0, 60), item: String(x.item || 'Venta').slice(0, 80),
+    buy: nn(x.buy, 0), sell: nn(x.sell, 0), qty: Math.min(9999, Math.max(1, Math.round(nn(x.qty, 1)))),
+    date: Number(x.date) || Date.now()
+  }));
   return out;
 }
 
@@ -189,6 +204,9 @@ function load() {
 }
 
 let S = load();
+/* la papelera se vacía sola a los 30 días */
+S.trash = S.trash.filter(n => Date.now() - n.deletedAt < 30 * 86400000);
+if (!store.get(FIRST_KEY)) store.set(FIRST_KEY, String(Date.now()));
 
 function save() {
   const ok = store.set(DATA_KEY, JSON.stringify(S));
@@ -264,6 +282,11 @@ const P = {
   eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
   eyeoff: '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>',
   chev: '<polyline points="9 18 15 12 9 6"/>',
+  pin: '<path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/>',
+  cash: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><line x1="6" y1="12" x2="6.01" y2="12"/><line x1="18" y1="12" x2="18.01" y2="12"/>',
+  undo: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
+  chat: '<path d="M21 11.5a8.4 8.4 0 0 1-12.4 7.4L3 21l1.9-5.4A8.4 8.4 0 1 1 21 11.5z"/>',
+  finger: '<path d="M12 11v4a5 5 0 0 0 1.5 3.5"/><path d="M8 11a4 4 0 0 1 8 0v2"/><path d="M5 12a7 7 0 0 1 14 0v2a9 9 0 0 1-2 5.5"/><path d="M8.5 15c0 2 .6 3.6 1.8 5"/>',
   info: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'
 };
@@ -300,7 +323,7 @@ function hdr(title, o = {}) {
 }
 
 function nav(active) {
-  const items = [['home', 'Inicio', 'home'], ['notes', 'Notas', 'note'], ['folders', 'Carpetas', 'folder'], ['stats', 'Estadísticas', 'chart'], ['profile', 'Perfil', 'user']];
+  const items = [['home', 'Inicio', 'home'], ['notes', 'Notas', 'note'], ['folders', 'Carpetas', 'folder'], ['sales', 'Ventas', 'cash'], ['profile', 'Perfil', 'user']];
   return `<nav class="nav" aria-label="Menú principal">${items.map(([r, l, i]) =>
     `<button data-go="#/${r}" class="${active === r ? 'on' : ''}" ${active === r ? 'aria-current="page"' : ''}>${ico(i)}<span>${l}</span></button>`).join('')}</nav>`;
 }
@@ -318,6 +341,7 @@ function viewLock() {
       <button class="btn" type="submit">${ico('lock')} ${first ? 'Crear y entrar' : 'Entrar'}</button>
     </form>
     <div class="err" id="lockErr"></div>
+    ${getFp() && fpSupported() ? `<button class="btn ghost sm fpbtn" type="button" data-act="fp-login">${ico('finger')} Entrar con huella</button>` : ''}
     ${first ? '' : '<button class="link" data-act="forgot">Olvidé mi contraseña</button>'}
   </div>`;
   const form = $('#lockForm');
@@ -337,7 +361,7 @@ function viewLock() {
       else { fails++; if (fails >= 5) { blockedUntil = Date.now() + 5000; fails = 0; } err('Contraseña incorrecta.'); $('#p1').value = ''; }
     }
   });
-  setTimeout(() => { const el = $('#p1'); el && el.focus(); }, 50);
+  if (getFp() && fpSupported()) setTimeout(fpLogin, 250); else setTimeout(() => { const el = $('#p1'); el && el.focus(); }, 50);
 }
 
 /* ----- inicio ----- */
@@ -348,7 +372,7 @@ function viewHome() {
   if (S.meta.lastBackup) {
     const days = Math.floor((Date.now() - S.meta.lastBackup) / 86400000);
     bk = `Última copia de seguridad: ${dateStr(S.meta.lastBackup)}`;
-    if (days >= 14) { bk += ' · conviene hacer otra'; warn = true; }
+    if (days >= 7) { bk += ' · conviene hacer otra'; warn = true; }
   } else { bk = 'Aún no has hecho ninguna copia de seguridad'; warn = true; }
   app.innerHTML = `<div class="screen home">
     <div class="hero" role="img" aria-label="RIHITO NOTES · Tu libreta, tus reglas">
@@ -381,13 +405,13 @@ function notePreview(n) {
 function noteCard(n) {
   return `<div class="ncard" style="background:${n.bg};color:${n.fg};--acc:${n.accent}" data-go="#/note/${n.id}">
     <div class="nico">${ico(n.type === 'calc' ? 'calc' : 'note')}</div>
-    <div class="nmid"><b>${esc(n.title || 'Sin título')}${n.type === 'calc' ? '<span class="cbadge">CÁLCULO</span>' : ''}</b><span class="pv">${esc(notePreview(n)) || '&nbsp;'}</span><small>${dateStr(n.updated)}</small></div>
+    <div class="nmid"><b>${n.pinned ? `<span class="pinb">${ico('pin')}</span>` : ''}${esc(n.title || 'Sin título')}${n.type === 'calc' ? '<span class="cbadge">CÁLCULO</span>' : ''}</b><span class="pv">${esc(notePreview(n)) || '&nbsp;'}</span><small>${dateStr(n.updated)}</small></div>
     <button class="dots" data-act="menu-note" data-id="${n.id}" aria-label="Opciones">${dotsIco}</button>
   </div>`;
 }
 function noteListHtml() {
   const q = noteQuery.trim().toLowerCase();
-  const list = S.notes.filter(n => !q || n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q) || (n.lines || []).some(l => l.d.toLowerCase().includes(q))).sort((a, b) => b.updated - a.updated);
+  const list = S.notes.filter(n => !q || n.title.toLowerCase().includes(q) || n.body.toLowerCase().includes(q) || (n.lines || []).some(l => l.d.toLowerCase().includes(q))).sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updated - a.updated);
   if (!list.length) return `<div class="empty">${S.notes.length ? 'No hay notas que coincidan.' : 'Todavía no tienes notas.<br>Toca el + de arriba.'}</div>`;
   return list.map(noteCard).join('');
 }
@@ -614,8 +638,8 @@ function viewCalcNote(note, mode) {
 /* ----- menú de la nota (⚙): Escribir / Editar / Borrar ----- */
 async function deleteNoteWithPassword(id) {
   const n = S.notes.find(x => x.id === id); if (!n) return false;
-  const ok = !getAuth() ? await confirmBox('Borrar nota', `¿Borrar “${n.title || 'Sin título'}”? No se puede deshacer.`, 'Borrar') : await dialog(`<h3>Borrar nota</h3>
-    <p>Para borrar “${esc(n.title || 'Sin título')}” escribe tu contraseña. No se puede deshacer.</p>
+  const ok = !getAuth() ? await confirmBox('Borrar nota', `¿Mover “${n.title || 'Sin título'}” a la papelera? La podrás recuperar durante 30 días.`, 'Borrar') : await dialog(`<h3>Borrar nota</h3>
+    <p>Para borrar “${esc(n.title || 'Sin título')}” escribe tu contraseña. Irá a la papelera 30 días.</p>
     ${pwInput('dp', 'Contraseña', 'current-password')}
     <div class="row" style="margin-top:14px"><button class="btn ghost sm" data-close="cancel">Cancelar</button><button class="btn danger sm" id="dok">${ico('trash')} Borrar</button></div>`,
   (ov, close) => {
@@ -628,14 +652,16 @@ async function deleteNoteWithPassword(id) {
     setTimeout(() => $('#dp', ov).focus(), 60);
   });
   if (!ok) return false;
-  S.notes = S.notes.filter(x => x.id !== id); save(); toast('Nota borrada');
+  S.notes = S.notes.filter(x => x.id !== id); S.trash.unshift({ ...n, deletedAt: Date.now() }); save(); toast('Nota movida a la papelera');
   return true;
 }
 async function noteMenu(id, fromList) {
   const n = S.notes.find(x => x.id === id); if (!n) return;
-  const k = await menuSheet(n.title || 'Nota', [['write', 'Escribir', 'pencil'], ['style', 'Editar', 'palette'], ['del', 'Borrar', 'trash', true]]);
+  const k = await menuSheet(n.title || 'Nota', [['write', 'Escribir', 'pencil'], ['style', 'Editar', 'palette'], ['pin', n.pinned ? 'Quitar de arriba' : 'Fijar arriba', 'pin'], ['wa', 'Compartir por WhatsApp', 'chat'], ['del', 'Borrar', 'trash', true]]);
   if (k === 'write') go('#/note/' + id + '/write');
   else if (k === 'style') go('#/note/' + id + '/style');
+  else if (k === 'pin') { if (n.pinned) delete n.pinned; else n.pinned = true; save(); toast(n.pinned ? 'Nota fijada arriba 📌' : 'Nota desfijada'); route(); }
+  else if (k === 'wa') shareWhatsApp(noteText(n));
   else if (k === 'del' && await deleteNoteWithPassword(id)) { if (fromList) route(); else go('#/notes', true); }
 }
 
@@ -892,6 +918,96 @@ function viewCalc() {
 }
 
 /* ----- estadísticas ----- */
+/* ----- compartir por WhatsApp ----- */
+function shareWhatsApp(text) {
+  const url = 'https://wa.me/?text=' + encodeURIComponent(text);
+  const w = window.open(url, '_blank', 'noopener');
+  if (!w && navigator.share) navigator.share({ text }).catch(() => {});
+}
+function noteText(n) {
+  if (n.type !== 'calc') return `*${n.title || 'Sin título'}*\n\n${n.body || ''}`.trim();
+  const tot = {};
+  const rows = (n.lines || []).filter(l => l.d.trim() || l.n.trim()).map(l => {
+    const v = num(l.n); if (Number.isFinite(v)) tot[l.c] = (tot[l.c] || 0) + v;
+    return `• ${l.d.trim() || '—'}${l.n.trim() ? ': ' + l.n.trim() + ' ' + l.c : ''}`;
+  });
+  const t = Object.keys(tot).map(c => `${fmt(tot[c])} ${c}`).join(' | ');
+  return `*${n.title || 'Sin título'}*\n\n${rows.join('\n')}${t ? `\n\n*Total:* ${t}` : ''}`;
+}
+
+/* ----- papelera ----- */
+function viewTrash() {
+  const list = S.trash.slice().sort((a, b) => b.deletedAt - a.deletedAt);
+  const left = n => Math.max(1, 30 - Math.floor((Date.now() - n.deletedAt) / 86400000));
+  app.innerHTML = `<div class="screen">
+    ${hdr('Papelera', { back: '#/profile', right: list.length ? `<button class="iconbtn sq" data-act="trash-empty" aria-label="Vaciar papelera">${ico('trash')}</button>` : '' })}
+    <div class="info" style="margin-bottom:10px">Las notas borradas se guardan aquí 30 días. Después se eliminan solas.</div>
+    <div class="list">${list.length ? list.map(n => `<div class="ncard" style="background:${n.bg};color:${n.fg};--acc:${n.accent}">
+      <div class="nico">${ico(n.type === 'calc' ? 'calc' : 'note')}</div>
+      <div class="nmid"><b>${esc(n.title || 'Sin título')}</b><span class="pv">${esc(notePreview(n)) || '&nbsp;'}</span><small>Se borra en ${left(n)} día(s)</small></div>
+      <div class="tact"><button class="btn sm" data-act="trash-restore" data-id="${n.id}">${ico('undo')} Recuperar</button><button class="btn ghost sm" data-act="trash-del" data-id="${n.id}">${ico('trash')}</button></div>
+    </div>`).join('') : '<div class="empty">La papelera está vacía.</div>'}</div>
+  </div>${nav('profile')}`;
+}
+
+/* ----- ventas ----- */
+const saleProfit = x => (x.sell - x.buy) * x.qty;
+const startOfDay = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+function saleTotals() {
+  const now = Date.now(), d0 = startOfDay(now), w0 = d0 - 6 * 86400000, m = new Date(now), m0 = new Date(m.getFullYear(), m.getMonth(), 1).getTime();
+  const sum = from => { const l = S.sales.filter(x => x.date >= from); return { n: l.length, p: l.reduce((a, x) => a + saleProfit(x), 0) }; };
+  return { day: sum(d0), week: sum(w0), month: sum(m0) };
+}
+function viewSales() {
+  const t = saleTotals(), list = S.sales.slice().sort((a, b) => b.date - a.date);
+  const box = (l, o) => `<div class="stat"><b class="${o.p >= 0 ? '' : 'neg'}">${fmt(o.p)}</b><span>${l}</span><i>${o.n} venta${o.n === 1 ? '' : 's'}</i></div>`;
+  app.innerHTML = `<div class="screen">
+    ${hdr('Ventas', { back: '#/home', right: `<button class="iconbtn sq" data-act="new-sale" aria-label="Nueva venta">${ico('plus')}</button>` })}
+    <div class="grid3 salestat">${box('Hoy', t.day)}${box('7 días', t.week)}${box('Este mes', t.month)}</div>
+    <div class="list">${list.length ? list.map(x => `<div class="scard">
+      <div class="sico">${ico('cash')}</div>
+      <div class="smid"><b>${esc(x.client || 'Sin cliente')}</b><span>${esc(x.item)}${x.qty > 1 ? ' × ' + x.qty : ''}</span><small>${dateStr(x.date)} ${timeStr(x.date)}</small></div>
+      <div class="sp ${saleProfit(x) >= 0 ? 'pos' : 'neg'}">${saleProfit(x) >= 0 ? '+' : ''}${fmt(saleProfit(x))}</div>
+      <button class="dots" data-act="menu-sale" data-id="${x.id}" aria-label="Opciones">${dotsIco}</button>
+    </div>`).join('') : '<div class="empty">Todavía no has anotado ventas.<br>Toca el + de arriba.</div>'}</div>
+    <div class="info" style="margin-top:12px">La ganancia de cada venta es (venta − compra) × cantidad.</div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost sm" data-go="#/stats">${ico('chart')} Ver estadísticas</button></div>
+  </div>${nav('sales')}`;
+}
+async function saleDialog() {
+  const offers = S.folders.flatMap(f => f.offers.map(o => ({ ...o, folder: f.name })));
+  const r = await dialog(`<h3>Nueva venta</h3>
+    <div class="field"><label for="sc">Cliente (opcional)</label><input class="input" id="sc" maxlength="60" placeholder="Nombre del cliente"></div>
+    <div class="field"><label for="so">Oferta</label><select class="input" id="so"><option value="">Otra (escribir abajo)</option>${offers.map(o => `<option value="${o.id}">${esc(o.name)} · ${esc(o.folder)}</option>`).join('')}</select></div>
+    <div class="field"><label for="si">Producto</label><input class="input" id="si" maxlength="80" placeholder="Ej: 220 Diamantes"></div>
+    <div class="grid3 sform"><div class="field"><label for="sb">Compra</label><input class="input" id="sb" inputmode="decimal" placeholder="0"></div>
+    <div class="field"><label for="ss">Venta</label><input class="input" id="ss" inputmode="decimal" placeholder="0"></div>
+    <div class="field"><label for="sq">Cantidad</label><input class="input" id="sq" inputmode="numeric" value="1"></div></div>
+    <div class="status" id="sg"></div>
+    <div class="row" style="margin-top:10px"><button class="btn ghost sm" data-close="cancel">Cancelar</button><button class="btn sm" id="sok">${ico('check')} Guardar</button></div>`,
+  (ov, close) => {
+    const g = id => $('#' + id, ov);
+    const calc = () => { const b = num(g('sb').value) || 0, v = num(g('ss').value), q = Math.max(1, Math.round(num(g('sq').value) || 1)); g('sg').textContent = Number.isFinite(v) ? `Ganancia: ${fmt((v - b) * q)}` : ''; };
+    g('so').addEventListener('change', () => { const o = offers.find(x => x.id === g('so').value); if (o) { g('si').value = o.name; g('sb').value = o.buy; g('ss').value = o.sell; calc(); } });
+    ['sb', 'ss', 'sq'].forEach(i => g(i).addEventListener('input', calc));
+    g('sok').addEventListener('click', () => {
+      const item = g('si').value.trim(), v = num(g('ss').value), b = num(g('sb').value) || 0;
+      if (!item) return toast('Escribe el producto', true);
+      if (!Number.isFinite(v)) return toast('Escribe el precio de venta', true);
+      close({ client: g('sc').value.trim(), item, buy: b, sell: v, qty: Math.min(9999, Math.max(1, Math.round(num(g('sq').value) || 1))) });
+    });
+    setTimeout(() => g('sc').focus(), 60);
+  });
+  if (!r) return;
+  S.sales.unshift({ id: uid(), ...r, date: Date.now() }); save(); toast('Venta anotada ✓'); route();
+}
+async function saleMenu(id) {
+  const x = S.sales.find(v => v.id === id); if (!x) return;
+  const k = await menuSheet(x.client || 'Venta', [['wa', 'Compartir por WhatsApp', 'chat'], ['del', 'Eliminar venta', 'trash', true]]);
+  if (k === 'wa') shareWhatsApp(`*Venta* ${dateStr(x.date)}\n${x.client ? 'Cliente: ' + x.client + '\n' : ''}${x.item}${x.qty > 1 ? ' × ' + x.qty : ''}\nPrecio: ${fmt(x.sell)} c/u\nTotal: ${fmt(x.sell * x.qty)}`);
+  else if (k === 'del' && await confirmBox('Eliminar venta', '¿Eliminar esta venta del registro?', 'Eliminar')) { S.sales = S.sales.filter(v => v.id !== id); save(); toast('Venta eliminada'); route(); }
+}
+
 function viewStats() {
   const all = S.folders.flatMap(f => f.offers.map(o => ({ ...o, folder: f.name })));
   const total = all.reduce((a, o) => a + profit(o), 0);
@@ -953,13 +1069,15 @@ function viewProfile() {
     <h4 class="sec"><span>Personalizar</span></h4>
     <div class="group">
       ${row('edit-app', 'palette', 'Editar App', 'Color y tipo de letra')}
+      ${row('go-trash', 'trash', 'Papelera', S.trash.length ? plural(S.trash.length, 'nota', 'notas') + ' · se borran a los 30 días' : 'Recupera notas borradas')}
     </div>
     <h4 class="sec"><span>Seguridad</span><button class="infobtn" data-act="info-security" aria-label="Más información">${ico('info')}</button></h4>
     <div class="group">
       ${row('pass-menu', 'lock', 'Contraseña', getAuth() ? 'Activada' : 'Sin contraseña')}
+      ${getAuth() && fpSupported() ? row('fp-toggle', 'finger', 'Entrar con huella', getFp() ? 'Activada' : 'Desactivada') : ''}
       ${getAuth() ? row('lock', 'lock', 'Bloquear ahora', 'Se bloquea sola tras 1 minuto en segundo plano') : ''}
     </div>
-    <div class="info" style="text-align:center;margin-top:16px;font-size:12px">RIHITO NOTES · versión 3.2</div>
+    <div class="info" style="text-align:center;margin-top:16px;font-size:12px">RIHITO NOTES · versión 3.4</div>
   </div>${nav('profile')}`;
 }
 
@@ -1063,8 +1181,8 @@ document.addEventListener('click', async e => {
   switch (a) {
     case 'open-ff': if (id) go('#/folder/' + id); else go('#/folders'); break;
     case 'more': {
-      const k = await menuSheet('Más opciones', [['calc', 'Calculadora', 'calc'], ['stats', 'Estadísticas', 'chart'], ['backup', 'Copias de seguridad', 'download'], ['nn', 'Nueva nota', 'note'], ['nf', 'Nueva carpeta', 'folder']].concat(getAuth() ? [['lock', 'Bloquear app', 'lock']] : []));
-      if (k === 'calc') go('#/calc'); else if (k === 'stats') go('#/stats'); else if (k === 'backup') go('#/profile'); else if (k === 'nn') newNoteChoice();
+      const k = await menuSheet('Más opciones', [['calc', 'Calculadora', 'calc'], ['sales', 'Ventas', 'cash'], ['stats', 'Estadísticas', 'chart'], ['trash', 'Papelera', 'trash'], ['backup', 'Copias de seguridad', 'download'], ['nn', 'Nueva nota', 'note'], ['nf', 'Nueva carpeta', 'folder']].concat(getAuth() ? [['lock', 'Bloquear app', 'lock']] : []));
+      if (k === 'calc') go('#/calc'); else if (k === 'sales') go('#/sales'); else if (k === 'trash') go('#/trash'); else if (k === 'stats') go('#/stats'); else if (k === 'backup') go('#/profile'); else if (k === 'nn') newNoteChoice();
       else if (k === 'nf') newFolder(); else if (k === 'lock') lockApp(); break;
     }
     case 'new-note': newNoteChoice(); break;
@@ -1101,12 +1219,24 @@ document.addEventListener('click', async e => {
     case 'info-data': await dialog(`<h3>Sobre tus datos</h3><p>Actualizar la app <b>no</b> borra tus datos. Solo se pierden si borras los datos del navegador desde Ajustes de Android, si desinstalas la app o si cambias de teléfono.</p><p>Haz copias de seguridad de vez en cuando y guárdalas fuera de la app (Drive, WhatsApp a ti mismo…).</p><button class="btn sm" data-close="ok">Entendido</button>`); break;
     case 'pass-menu': passMenu(); break;
     case 'edit-app': go('#/editapp'); break;
+    case 'go-trash': go('#/trash'); break;
+    case 'new-sale': saleDialog(); break;
+    case 'menu-sale': saleMenu(id); break;
+    case 'trash-restore': { const n = S.trash.find(x => x.id === id); if (!n) break; S.trash = S.trash.filter(x => x.id !== id); const { deletedAt, ...rest } = n; S.notes.unshift({ ...rest, updated: Date.now() }); save(); toast('Nota recuperada ✓'); route(); break; }
+    case 'trash-del': { const n = S.trash.find(x => x.id === id); if (!n) break;
+      const ok = getAuth() ? await askPassword('Eliminar para siempre', 'Escribe tu contraseña. Esta nota no se podrá recuperar.', 'Eliminar') : await confirmBox('Eliminar para siempre', 'Esta nota no se podrá recuperar.', 'Eliminar');
+      if (ok) { S.trash = S.trash.filter(x => x.id !== id); save(); toast('Nota eliminada'); route(); } break; }
+    case 'trash-empty': { if (!S.trash.length) break;
+      const ok = getAuth() ? await askPassword('Vaciar papelera', 'Escribe tu contraseña. Se eliminarán para siempre las ' + S.trash.length + ' nota(s).', 'Vaciar') : await confirmBox('Vaciar papelera', 'Se eliminarán para siempre las ' + S.trash.length + ' nota(s).', 'Vaciar');
+      if (ok) { S.trash = []; save(); toast('Papelera vaciada'); route(); } break; }
+    case 'fp-toggle': fpToggle(); break;
+    case 'fp-login': fpLogin(); break;
     case 'pick-color': pickColor(); break;
     case 'pick-font': pickFont(); break;
     case 'profile-edit': profileEdit(); break;
     case 'forgot': {
       const r = await confirmBox('Olvidé mi contraseña', 'No existe forma de recuperarla: por seguridad está guardada sin poder leerse. Si continúas se borrarán la contraseña y TODOS los datos de este dispositivo; después podrás restaurar una copia de seguridad (.json) si la tienes.', 'Borrar todo y empezar de nuevo');
-      if (r) { store.del(AUTH_KEY); store.set(PREV_KEY, JSON.stringify(S)); S = defaultData(); save(); unlocked = false; route(); }
+      if (r) { store.del(AUTH_KEY); store.del(FP_KEY); store.set(PREV_KEY, JSON.stringify(S)); S = defaultData(); save(); unlocked = false; route(); }
       break;
     }
   }
@@ -1150,7 +1280,6 @@ function viewEditApp() {
 async function pickColor() {
   const cu = S.profile.custom || { h: 90, s: .8, v: .9 };
   await dialog(`<h3>Cambiar color</h3><p>Toca un color: se aplica al instante.</p>
-    <button class="switch ${S.profile.bg === 'black' ? 'on' : ''}" id="bgsw" role="switch" aria-checked="${S.profile.bg === 'black'}"><span>Fondo negro puro</span><i></i></button>
     <h4 class="pk-t">Paletas (color + negro)</h4>
     <div class="pick-grid" id="pal">${PALETTES.map(x => `<button class="thm" data-pal="${x.id}"><i class="split" style="--c:${x.c}"></i><span>${esc(x.name)}</span></button>`).join('')}</div>
     <h4 class="pk-t">Mezclar tu color</h4>
@@ -1168,12 +1297,7 @@ async function pickColor() {
     });
     $('#pal', ov).addEventListener('click', e => {
       const b = e.target.closest('[data-pal]'); if (!b) return;
-      S.profile.theme = b.dataset.pal; S.profile.bg = 'black'; save(); applyTheme(); mark();
-      const sw = $('#bgsw', ov); sw.classList.add('on'); sw.setAttribute('aria-checked', 'true');
-    });
-    $('#bgsw', ov).addEventListener('click', e => {
-      S.profile.bg = S.profile.bg === 'black' ? 'tint' : 'black'; save(); applyTheme();
-      e.currentTarget.classList.toggle('on', S.profile.bg === 'black'); e.currentTarget.setAttribute('aria-checked', S.profile.bg === 'black');
+      S.profile.theme = b.dataset.pal; save(); applyTheme(); mark();
     });
     const sv = $('#sv', ov), dot = $('#svd', ov), hue = $('#hue', ov), msw = $('#mixsw', ov);
     const cur = { h: cu.h, s: cu.s, v: cu.v };
@@ -1272,7 +1396,7 @@ async function passMenu() {
   else if (k === 'wipe') await wipeAll();
   else if (k === 'remove') {
     if (await askPassword('Quitar contraseña', 'Escribe tu contraseña para quitarla. La app se abrirá sin pedir nada.', 'Quitar')) {
-      store.del(AUTH_KEY); unlocked = true; toast('Contraseña quitada'); route();
+      store.del(AUTH_KEY); store.del(FP_KEY); unlocked = true; toast('Contraseña quitada'); route();
     }
   }
 }
@@ -1311,6 +1435,43 @@ async function changePass() {
   }));
 }
 
+/* ----- huella (solo si hay contraseña) ----- */
+const fpSupported = () => !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
+const getFp = () => { try { return JSON.parse(store.get(FP_KEY) || 'null'); } catch (e) { return null; } };
+const rnd = n => crypto.getRandomValues(new Uint8Array(n));
+async function fpToggle() {
+  if (getFp()) { if (await confirmBox('Huella', '¿Dejar de entrar con huella? Seguirás entrando con tu contraseña.', 'Desactivar', false)) { store.del(FP_KEY); toast('Huella desactivada'); route(); } return; }
+  try {
+    const cred = await navigator.credentials.create({ publicKey: {
+      challenge: rnd(32), rp: { name: 'RIHITO NOTES', id: location.hostname }, user: { id: rnd(16), name: 'rihito', displayName: 'RIHITO' },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
+      authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' }, timeout: 60000 } });
+    store.set(FP_KEY, JSON.stringify({ id: toHex(new Uint8Array(cred.rawId)) }));
+    toast('Huella activada ✓'); route();
+  } catch (e) { toast('No se pudo activar la huella. Revisa que tengas una huella guardada en el teléfono.', true); }
+}
+async function fpLogin() {
+  const f = getFp(); if (!f) return false;
+  try {
+    await navigator.credentials.get({ publicKey: { challenge: rnd(32), rpId: location.hostname, userVerification: 'required', timeout: 60000,
+      allowCredentials: [{ type: 'public-key', id: fromHex(f.id), transports: ['internal'] }] } });
+    unlocked = true; if (!location.hash || location.hash === '#/lock') location.hash = '#/home'; route(); return true;
+  } catch (e) { return false; }
+}
+
+/* ----- recordatorio de copia de seguridad ----- */
+let reminded = false;
+async function maybeRemindBackup() {
+  if (reminded) return; reminded = true;
+  const snooze = Number(store.get(SNOOZE_KEY)) || 0; if (Date.now() < snooze) return;
+  const lb = S.meta.lastBackup, first = Number(store.get(FIRST_KEY)) || Date.now();
+  const days = lb ? Math.floor((Date.now() - lb) / 86400000) : Math.floor((Date.now() - first) / 86400000);
+  if (lb ? days < 7 : days < 2) return;
+  const k = await dialog(`<h3>Haz tu copia de seguridad</h3><p>${lb ? `Hace ${days} días que no haces una copia.` : 'Todavía no has hecho ninguna copia.'} Así no pierdes tus notas ni tus ventas si cambias de teléfono o borras los datos.</p>
+    <div class="row"><button class="btn ghost sm" data-close="later">Más tarde</button><button class="btn sm" data-close="now">${ico('download')} Exportar ahora</button></div>`);
+  if (k === 'now') exportBackup(); else store.set(SNOOZE_KEY, String(Date.now() + 86400000));
+}
+
 /* ----- enrutador ----- */
 function route() {
   applyTheme();
@@ -1330,10 +1491,13 @@ function route() {
     case 'offerform': viewOfferForm(a, b || 'new'); break;
     case 'calc': viewCalc(); break;
     case 'stats': viewStats(); break;
+    case 'sales': viewSales(); break;
+    case 'trash': viewTrash(); break;
     case 'profile': viewProfile(); break;
     case 'editapp': viewEditApp(); break;
     default: viewHome();
   }
+  if (!r || r === 'home') maybeRemindBackup();
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-eye]'); if (!b) return;

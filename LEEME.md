@@ -180,3 +180,15 @@ No pude generar un APK desde aquí (no hay herramientas de Android disponibles e
 
 ## 19. Versión 3.2 — Paletas y mezclador
 - Cambiar color: interruptor "Fondo negro puro", 10 paletas color + negro, cuadro para mezclar cualquier color (cuadro + barra de tono) y los 14 colores.
+
+## 20. Versión 3.3 — Estilo limpio
+- Misma forma de siempre; interior grafito/negro y un solo color de acento (bordes, rayas, iconos).
+- Todas las letras y números en blanco.
+- Fondo siempre negro (se quitó el interruptor de fondo negro).
+
+## 21. Versión 3.4
+- **Ventas** (menú de abajo): anota cliente, producto, compra, venta y cantidad; totales de hoy, 7 días y mes; compartir por WhatsApp. Estadísticas se abre desde Ventas o desde "Más".
+- **Papelera** (Perfil): las notas borradas se guardan 30 días; recuperar, eliminar para siempre o vaciar.
+- **Fijar arriba** y **Compartir por WhatsApp** en el menú de cada nota.
+- **Recordatorio de copia de seguridad**: al abrir la app, si llevas 7+ días sin copia (o 2 días de uso sin ninguna).
+- **Huella**: Perfil → Seguridad → Entrar con huella (solo aparece si tienes contraseña). La contraseña siempre sigue funcionando.
