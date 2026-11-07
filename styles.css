@@ -671,3 +671,33 @@ select.input { appearance: none; -webkit-appearance: none; }
 .fpbtn { margin-top: 14px; width: auto; display: inline-flex; }
 .lock .fpbtn { align-self: center; }
 .sform { align-items: start; } .sform .field { margin: 0; min-width: 0; } .sform .input { padding-left: 10px; padding-right: 10px; }
+
+/* v3.5 carpeta de cuentas FF */
+.seg { display: flex; gap: 8px; }
+.seg button { flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); color: #fff; font-weight: 700; font-size: 15px; }
+.seg button .ico { width: 18px; height: 18px; }
+.seg button.on { background: var(--acc); color: #08080a; border-color: transparent; }
+.acard { display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; margin-bottom: 10px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); }
+.acard:active { filter: brightness(1.2); }
+.acard .aico { color: var(--acc); flex: none; }
+.acard .aico .ico { width: 28px; height: 28px; }
+.acard .amid { flex: 1; min-width: 0; }
+.acard .amid b { display: block; font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acard .amid span { display: block; font-size: 12.5px; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acard .amid small { font-size: 11.5px; opacity: .55; }
+.acard .sp { font-weight: 800; font-size: 14px; flex: none; text-align: right; }
+.accsum { margin-top: 4px; margin-bottom: 14px; }
+.accsum .r .val { font-size: 16px; text-align: right; }
+.accbox { padding: 4px 14px; margin-bottom: 12px; }
+.crow { display: flex; align-items: center; gap: 8px; padding: 12px 0; }
+.crow + .crow { border-top: 1px solid var(--line); }
+.crow.col { flex-direction: column; align-items: stretch; }
+.crow .cx { flex: 1; min-width: 0; }
+.crow .cx small { display: block; opacity: .6; font-size: 12px; margin-bottom: 3px; }
+.crow .cx span { font-size: 16.5px; font-weight: 600; word-break: break-all; }
+.cbtn { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; border: 1px solid var(--line); background: var(--card2); color: var(--acc); flex: none; }
+.cbtn .ico { width: 20px; height: 20px; }
+.cchips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.cchip { padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card2); color: #fff; font-weight: 700; font-size: 15.5px; letter-spacing: .09em; font-variant-numeric: tabular-nums; }
+.cchip:active { background: var(--acc); color: #08080a; }
+.gwin { min-height: 50px; display: flex; align-items: center; font-weight: 800; font-size: 14.5px; }

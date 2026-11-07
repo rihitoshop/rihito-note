@@ -160,7 +160,13 @@ function normalize(d) {
     out.folders.push({
       id: String(f.id || uid()), name: String(f.name || 'Carpeta').slice(0, 60),
       emoji: String(f.emoji || '').slice(0, 8), color: /^#[0-9a-f]{6}$/i.test(f.color) ? f.color : FCOLORS[i % FCOLORS.length],
-      created: Number(f.created) || Date.now(),
+      created: Number(f.created) || Date.now(), kind: f.kind === 'accounts' ? 'accounts' : 'offers',
+      accounts: (Array.isArray(f.accounts) ? f.accounts : []).slice(0, 5000).filter(a => a && typeof a === 'object').map(a => ({
+        id: String(a.id || uid()), email: String(a.email || '').slice(0, 120), pass: String(a.pass || '').slice(0, 120),
+        codes: (Array.isArray(a.codes) ? a.codes : []).map(c => String(c).replace(/\D/g, '')).filter(c => c.length === 8).slice(0, 30),
+        cur: CURS.includes(a.cur) ? a.cur : CURS[0], buy: Number.isFinite(+a.buy) ? +a.buy : 0, sell: Number.isFinite(+a.sell) ? +a.sell : 0,
+        notes: String(a.notes || '').slice(0, 5000), created: Number(a.created) || Date.now()
+      })),
       offers: (Array.isArray(f.offers) ? f.offers : []).filter(o => o && typeof o === 'object').map(o => ({
         id: String(o.id || uid()), name: String(o.name || 'Oferta').slice(0, 80),
         buy: Number.isFinite(+o.buy) ? +o.buy : 0, sell: Number.isFinite(+o.sell) ? +o.sell : 0,
@@ -282,6 +288,9 @@ const P = {
   eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
   eyeoff: '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>',
   chev: '<polyline points="9 18 15 12 9 6"/>',
+  copy: '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  mail: '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22 7 12 13 2 7"/>',
+  key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 21 2"/><path d="M17 6l3 3"/><path d="M14 9l2 2"/>',
   pin: '<path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"/>',
   cash: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><line x1="6" y1="12" x2="6.01" y2="12"/><line x1="18" y1="12" x2="18.01" y2="12"/>',
   undo: '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>',
@@ -672,7 +681,7 @@ function viewFolders() {
     <div class="list">
       ${S.folders.map(f => `<div class="fcard" style="--c:${f.color}" data-go="#/folder/${f.id}">
         <div class="fico">${folderSvg}</div>
-        <div class="fmid"><b>${esc(f.name)}</b><small>${plural(f.offers.length, 'oferta', 'ofertas')}</small></div>
+        <div class="fmid"><b>${esc(f.name)}</b><small>${f.kind === 'accounts' ? plural(f.accounts.length, 'cuenta', 'cuentas') : plural(f.offers.length, 'oferta', 'ofertas')}</small></div>
         ${f.emoji ? `<span class="emo">${esc(f.emoji)}</span>` : ''}
         <button class="dots" data-act="menu-folder" data-id="${f.id}" aria-label="Opciones">${dotsIco}</button>
       </div>`).join('') || '<div class="empty">No tienes carpetas.</div>'}
@@ -683,6 +692,7 @@ function viewFolders() {
 
 function viewFolder(fid) {
   const f = folderOf(fid); if (!f) { go('#/folders', true); return; }
+  if (f.kind === 'accounts') { viewAccounts(f); return; }
   app.innerHTML = `<div class="screen">
     ${hdr(`${f.emoji ? esc(f.emoji) + ' ' : ''}${esc(f.name)}`, { back: '#/folders', right: `<span style="font-size:26px;opacity:.8">👑</span><button class="iconbtn" data-act="menu-folder" data-id="${f.id}" aria-label="Opciones">${dotsIco}</button>` })}
     <div class="list" id="offers">
@@ -698,6 +708,114 @@ function viewFolder(fid) {
       <button class="btn dashed" data-act="add-offer" data-f="${f.id}">${ico('plus')} Añadir Oferta</button>
     </div>
   </div>${nav('folders')}`;
+}
+
+/* ----- carpeta de CUENTAS FF ----- */
+const accProfit = a => a.sell - a.buy;
+const money = (n, c) => `${fmt(n)} ${c}`;
+const sumCur = (list, fn) => { const t = {}; list.forEach(a => { t[a.cur] = (t[a.cur] || 0) + fn(a); }); return Object.keys(t).map(c => money(t[c], c)).join(' · ') || '—'; };
+const accOf = (fid, aid) => { const f = folderOf(fid); return f && f.accounts ? f.accounts.find(x => x.id === aid) : null; };
+function viewAccounts(f) {
+  app.innerHTML = `<div class="screen">
+    ${hdr(`${f.emoji ? esc(f.emoji) + ' ' : ''}${esc(f.name)}`, { back: '#/folders', right: `<button class="iconbtn" data-act="menu-folder" data-id="${f.id}" aria-label="Opciones">${dotsIco}</button>` })}
+    <div class="stats-box accsum">
+      <div class="r"><span class="lbl">Cuentas guardadas</span><span class="val">${f.accounts.length}</span></div>
+      <div class="r"><span class="lbl">Invertido</span><span class="val">${sumCur(f.accounts, a => a.buy)}</span></div>
+      <div class="r"><span class="lbl">Ganancia total</span><span class="val ${f.accounts.reduce((t, a) => t + accProfit(a), 0) >= 0 ? 'pos' : 'neg'}">${sumCur(f.accounts, accProfit)}</span></div>
+    </div>
+    <div class="list">
+      ${f.accounts.map(a => `<div class="acard" data-go="#/account/${f.id}/${a.id}">
+        <div class="aico">${ico('mail')}</div>
+        <div class="amid"><b>${esc(a.email || 'Sin correo')}</b><span>Compra ${money(a.buy, a.cur)} · Venta ${money(a.sell, a.cur)}</span><small>${a.codes.length ? a.codes.length + ' código' + (a.codes.length === 1 ? '' : 's') : 'Sin códigos'}</small></div>
+        <div class="sp ${accProfit(a) >= 0 ? 'pos' : 'neg'}">${accProfit(a) >= 0 ? '+' : ''}${money(accProfit(a), a.cur)}</div>
+      </div>`).join('')}
+      <button class="btn dashed" data-act="add-account" data-f="${f.id}">${ico('plus')} Añadir Cuenta</button>
+    </div>
+  </div>${nav('folders')}`;
+}
+function viewAccount(fid, aid) {
+  const f = folderOf(fid), a = accOf(fid, aid);
+  if (!a) { go(f ? '#/folder/' + fid : '#/folders', true); return; }
+  const show = flash; flash = null;
+  const row = (lbl, val, btns = '') => `<div class="crow"><div class="cx"><small>${lbl}</small><span>${val}</span></div>${btns}</div>`;
+  const cbtn = (w, ic = 'copy', lbl = 'Copiar') => `<button class="cbtn" data-act="acc-copy" data-f="${fid}" data-id="${aid}" data-w="${w}" aria-label="${lbl}">${ico(ic)}</button>`;
+  app.innerHTML = `<div class="screen">
+    ${hdr('Cuenta FF', { back: '#/folder/' + fid })}
+    <div class="panel accbox">
+      ${row('Correo electrónico', esc(a.email || '—'), a.email ? cbtn('email') : '')}
+      ${row('Contraseña', `<span id="pwv" data-shown="0">${a.pass ? '••••••••' : '—'}</span>`, a.pass ? `<button class="cbtn" data-act="acc-eye" data-f="${fid}" data-id="${aid}" aria-label="Mostrar contraseña">${ico('eye')}</button>${cbtn('pass')}` : '')}
+      <div class="crow col"><div class="cx"><small>Códigos de 8 dígitos${a.codes.length ? ' (toca uno para copiarlo)' : ''}</small></div>
+        ${a.codes.length ? `<div class="cchips">${a.codes.map((c, i) => `<button class="cchip" data-act="acc-copy" data-f="${fid}" data-id="${aid}" data-w="c${i}">${c}</button>`).join('')}</div>
+        <button class="btn ghost sm" data-act="acc-copy" data-f="${fid}" data-id="${aid}" data-w="codes" style="margin-top:10px">${ico('copy')} Copiar todos</button>` : '<span class="cx" style="opacity:.6">Sin códigos</span>'}
+      </div>
+    </div>
+    <div class="stats-box">
+      <div class="r"><span class="lead">🪙</span><span class="lbl">Precio de compra:</span><span class="val">${money(a.buy, a.cur)}</span></div>
+      <div class="r"><span class="lead">💰</span><span class="lbl">Precio de venta:</span><span class="val">${money(a.sell, a.cur)}</span></div>
+      <div class="r"><span class="lead" style="color:#22c55e">${ico('trend')}</span><span class="lbl">Ganancia:</span><span class="val ${accProfit(a) >= 0 ? 'pos' : 'neg'}">${accProfit(a) >= 0 ? '+' : ''}${money(accProfit(a), a.cur)}</span></div>
+    </div>
+    ${a.notes ? `<div class="notes-box"><h4>Notas</h4>${esc(a.notes)}</div>` : ''}
+    <div class="row" style="margin-top:14px">
+      <button class="btn" data-act="edit-account" data-f="${fid}" data-id="${aid}">${ico('pencil')} Editar</button>
+      <button class="btn danger" data-act="del-account" data-f="${fid}" data-id="${aid}">${ico('trash')} Eliminar</button>
+    </div>
+    ${show ? `<div class="ok-banner"><span class="crown">👑</span><div><b>¡Todo listo!</b><span>Cuenta guardada correctamente.</span></div><span class="tick">${ico('check')}</span></div>` : ''}
+  </div>${nav('folders')}`;
+}
+function viewAccountForm(fid, aid) {
+  const f = folderOf(fid); if (!f || f.kind !== 'accounts') { go('#/folders', true); return; }
+  const a = aid === 'new' ? null : accOf(fid, aid);
+  if (aid !== 'new' && !a) { go('#/folder/' + fid, true); return; }
+  let cur = a ? a.cur : CURS[0];
+  const back = a ? `#/account/${fid}/${aid}` : '#/folder/' + fid;
+  app.innerHTML = `<div class="screen nonav">
+    ${hdr(a ? 'Editar Cuenta' : 'Añadir Cuenta', { back, lead: ico('mail') })}
+    <form class="panel" id="af" autocomplete="off" novalidate>
+      <div class="field"><label for="ae">Correo electrónico</label><input class="input" id="ae" type="text" inputmode="email" autocapitalize="off" maxlength="120" placeholder="correo@gmail.com" value="${esc(a ? a.email : '')}"></div>
+      <div class="field"><label for="ap">Contraseña</label>${pwInput('ap', 'Contraseña de la cuenta', 'off')}</div>
+      <div class="field"><label for="ac">Códigos de 8 dígitos</label><textarea class="input" id="ac" inputmode="numeric" placeholder="Uno por línea o separados por espacio&#10;12345678&#10;87654321">${esc(a ? a.codes.join('\n') : '')}</textarea><div class="status" id="acn" style="text-align:left"></div></div>
+      <div class="field"><label>Moneda</label><div class="seg" id="acur">${CURS.map(c => `<button type="button" data-c="${c}" class="${c === cur ? 'on' : ''}">${c}</button>`).join('')}</div></div>
+      <div class="grid3 sform"><div class="field"><label for="ab">Compra</label><input class="input" id="ab" inputmode="decimal" placeholder="0" value="${a ? fmt(a.buy) : ''}"></div>
+      <div class="field"><label for="as">Venta</label><input class="input" id="as" inputmode="decimal" placeholder="0" value="${a ? fmt(a.sell) : ''}"></div>
+      <div class="field"><label>Ganó</label><div class="gwin" id="ag">—</div></div></div>
+      <div class="field"><label for="an">Notas (opcional)</label><textarea class="input" id="an" maxlength="2000" placeholder="Cliente, nivel, detalles…">${esc(a ? a.notes : '')}</textarea></div>
+      <div class="stack" style="margin-top:16px">
+        <button class="btn" type="submit">${ico('check')} Guardar Cuenta</button>
+        <button class="btn ghost" type="button" data-go="${back}">${ico('x')} Cancelar</button>
+      </div>
+    </form>
+  </div>`;
+  const g = id => $('#' + id);
+  g('ap').value = a ? a.pass : '';
+  const parseCodes = () => (g('ac').value.match(/[^\s,;]+/g) || []);
+  const upd = () => {
+    const B = num(g('ab').value), Sv = num(g('as').value);
+    g('ag').innerHTML = (Number.isNaN(B) || Number.isNaN(Sv)) ? '—' : `<span class="${Sv - B >= 0 ? 'pos' : 'neg'}">${Sv - B >= 0 ? '+' : ''}${money(Sv - B, cur)}</span>`;
+    const cs = parseCodes(), bad = cs.filter(c => !/^\d{8}$/.test(c)).length;
+    g('acn').textContent = cs.length ? `${cs.length - bad} código(s) válido(s)${bad ? ` · ${bad} sin 8 dígitos` : ''}` : '';
+  };
+  ['ab', 'as', 'ac'].forEach(i => g(i).addEventListener('input', upd));
+  g('acur').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; cur = b.dataset.c; g('acur').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); upd(); });
+  upd();
+  g('af').addEventListener('submit', e => {
+    e.preventDefault();
+    const email = g('ae').value.trim(), B = num(g('ab').value), Sv = num(g('as').value), cs = parseCodes();
+    if (!email) { toast('Escribe el correo de la cuenta', true); g('ae').focus(); return; }
+    if (cs.some(c => !/^\d{8}$/.test(c))) { toast('Cada código debe tener exactamente 8 números', true); g('ac').focus(); return; }
+    if (Number.isNaN(B) || B < 0) { toast('Precio de compra no válido', true); g('ab').focus(); return; }
+    if (Number.isNaN(Sv) || Sv < 0) { toast('Precio de venta no válido', true); g('as').focus(); return; }
+    const data = { email, pass: g('ap').value, codes: cs.slice(0, 30), cur, buy: B, sell: Sv, notes: g('an').value.trim() };
+    let id;
+    if (a) { Object.assign(a, data); id = a.id; } else { id = uid(); f.accounts.push({ id, ...data, created: Date.now() }); }
+    if (save()) { flash = true; go(`#/account/${fid}/${id}`, true); }
+  });
+  setTimeout(() => g('ae').focus(), 60);
+}
+function copyText(t) {
+  const done = () => toast('Copiado ✓');
+  if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(t).then(done, () => toast('No se pudo copiar', true)); return; }
+  const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); done(); } catch (e) { toast('No se pudo copiar', true); } ta.remove();
 }
 
 /* ----- oferta: ficha ----- */
@@ -1077,7 +1195,7 @@ function viewProfile() {
       ${getAuth() && fpSupported() ? row('fp-toggle', 'finger', 'Entrar con huella', getFp() ? 'Activada' : 'Desactivada') : ''}
       ${getAuth() ? row('lock', 'lock', 'Bloquear ahora', 'Se bloquea sola tras 1 minuto en segundo plano') : ''}
     </div>
-    <div class="info" style="text-align:center;margin-top:16px;font-size:12px">RIHITO NOTES · versión 3.4</div>
+    <div class="info" style="text-align:center;margin-top:16px;font-size:12px">RIHITO NOTES · versión 3.5</div>
   </div>${nav('profile')}`;
 }
 
@@ -1112,7 +1230,9 @@ function menuSheet(title, items) {
 }
 async function folderDialog(f) {
   let color = f ? f.color : FCOLORS[S.folders.length % FCOLORS.length];
+  let kind = f ? f.kind : 'offers';
   return dialog(`<h3>${f ? 'Cambiar nombre' : 'Nueva carpeta'}</h3>
+    ${f ? '' : `<div class="field"><label>Tipo de carpeta</label><div class="seg" id="fk"><button type="button" data-k="offers" class="on">${ico('cash')} Ofertas</button><button type="button" data-k="accounts">${ico('user')} Cuentas FF</button></div></div>`}
     <div class="field"><label for="fn">Nombre</label><input class="input" id="fn" maxlength="60" placeholder="Ej: Cuentas de FF" value="${esc(f ? f.name : '')}"></div>
     <div class="field"><label for="fe">Emoji (opcional)</label><input class="input" id="fe" maxlength="4" placeholder="💎 🎮 ⭐" value="${esc(f ? f.emoji : '')}"></div>
     <div class="field"><label>Color</label><div class="sw" id="fc"></div></div>
@@ -1120,11 +1240,17 @@ async function folderDialog(f) {
   (ov, close) => {
     const paint = () => { $('#fc', ov).innerHTML = FCOLORS.map(c => `<button type="button" data-c="${c}" class="${c === color ? 'on' : ''}" style="background:${c}" aria-label="Color"></button>`).join(''); };
     paint();
+    const fk = $('#fk', ov);
+    if (fk) fk.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return; kind = b.dataset.k;
+      fk.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+      $('#fn', ov).placeholder = kind === 'accounts' ? 'Ej: Cuentas FF' : 'Ej: Diamantes Free Fire';
+    });
     $('#fc', ov).addEventListener('click', e => { const b = e.target.closest('button'); if (b) { color = b.dataset.c; paint(); } });
     $('#fok', ov).addEventListener('click', () => {
       const name = $('#fn', ov).value.trim();
       if (!name) { toast('Escribe un nombre', true); return; }
-      close({ name, emoji: $('#fe', ov).value.trim(), color });
+      close({ name, emoji: $('#fe', ov).value.trim(), color, kind });
     });
     setTimeout(() => $('#fn', ov).focus(), 60);
   });
@@ -1195,13 +1321,20 @@ document.addEventListener('click', async e => {
       if (k === 'open') go('#/folder/' + id);
       else if (k === 'ren') { const r = await folderDialog(f); if (r) { Object.assign(f, r); save(); toast('Carpeta actualizada ✓'); route(); } }
       else if (k === 'del') {
-        const n = f.offers.length;
-        if (await confirmBox('Eliminar carpeta', `Se eliminará “${f.name}”${n ? ` y sus ${n} oferta(s)` : ''}. No se puede deshacer.`, 'Eliminar')) {
+        const n = f.kind === 'accounts' ? f.accounts.length : f.offers.length;
+        if (await confirmBox('Eliminar carpeta', `Se eliminará “${f.name}”${n ? ` y sus ${n} ${f.kind === 'accounts' ? 'cuenta(s)' : 'oferta(s)'}` : ''}. No se puede deshacer.`, 'Eliminar')) {
           S.folders = S.folders.filter(x => x.id !== id); save(); toast('Carpeta eliminada');
           if (location.hash.startsWith('#/folder/')) go('#/folders', true); else route();
         }
       } break;
     }
+    case 'add-account': go(`#/accountform/${fid}/new`); break;
+    case 'edit-account': go(`#/accountform/${fid}/${id}`); break;
+    case 'del-account': { const f = folderOf(fid), a = accOf(fid, id); if (!a) break;
+      if (await confirmBox('Eliminar cuenta', `¿Eliminar la cuenta ${a.email || ''}?`, 'Eliminar')) { f.accounts = f.accounts.filter(x => x.id !== id); save(); toast('Cuenta eliminada'); go('#/folder/' + fid, true); } break; }
+    case 'acc-eye': { const a = accOf(fid, id), sp = $('#pwv'); if (!a || !sp) break; const on = sp.dataset.shown === '1'; sp.dataset.shown = on ? '0' : '1'; sp.textContent = on ? '••••••••' : a.pass; el.innerHTML = ico(on ? 'eye' : 'eyeoff'); break; }
+    case 'acc-copy': { const a = accOf(fid, id); if (!a) break; const w = el.dataset.w;
+      copyText(w === 'email' ? a.email : w === 'pass' ? a.pass : w === 'codes' ? a.codes.join('\n') : a.codes[+w.slice(1)] || ''); break; }
     case 'add-offer': go(`#/offerform/${fid}/new`); break;
     case 'edit-offer': go(`#/offerform/${fid}/${id}`); break;
     case 'del-offer': case 'del-offer-detail': {
@@ -1244,7 +1377,7 @@ document.addEventListener('click', async e => {
 
 async function newFolder() {
   const r = await folderDialog(null); if (!r) return;
-  const f = { id: uid(), name: r.name, emoji: r.emoji, color: r.color, created: Date.now(), offers: [] };
+  const f = { id: uid(), name: r.name, emoji: r.emoji, color: r.color, created: Date.now(), kind: r.kind === 'accounts' ? 'accounts' : 'offers', offers: [], accounts: [] };
   S.folders.push(f); save(); toast('Carpeta creada ✓'); go('#/folder/' + f.id);
 }
 function lockApp() { if (!getAuth()) return; unlocked = false; history.replaceState(null, '', '#/home'); route(); }
@@ -1488,6 +1621,8 @@ function route() {
     case 'folders': viewFolders(); break;
     case 'folder': viewFolder(a); break;
     case 'offer': viewOffer(a, b); break;
+    case 'account': viewAccount(a, b); break;
+    case 'accountform': viewAccountForm(a, b || 'new'); break;
     case 'offerform': viewOfferForm(a, b || 'new'); break;
     case 'calc': viewCalc(); break;
     case 'stats': viewStats(); break;

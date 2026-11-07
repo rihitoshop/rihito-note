@@ -192,3 +192,9 @@ No pude generar un APK desde aquí (no hay herramientas de Android disponibles e
 - **Fijar arriba** y **Compartir por WhatsApp** en el menú de cada nota.
 - **Recordatorio de copia de seguridad**: al abrir la app, si llevas 7+ días sin copia (o 2 días de uso sin ninguna).
 - **Huella**: Perfil → Seguridad → Entrar con huella (solo aparece si tienes contraseña). La contraseña siempre sigue funcionando.
+
+## 22. Versión 3.5 — Carpetas de Cuentas FF
+- Al crear una carpeta eliges el tipo: **Ofertas** (como siempre) o **Cuentas FF**.
+- Cada cuenta guarda correo, contraseña, códigos de 8 dígitos, moneda (CUP, SM, $), precio de compra, precio de venta y ganancia (se calcula sola). Botones para copiar cada dato.
+- Resumen de la carpeta: cuentas guardadas, invertido y ganancia total por moneda.
+- Las contraseñas se guardan en el teléfono sin cifrar, igual que las notas.
