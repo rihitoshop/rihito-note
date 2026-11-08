@@ -202,3 +202,9 @@ No pude generar un APK desde aquí (no hay herramientas de Android disponibles e
 ## 23. Versión 3.6
 - Cada cuenta FF tiene **Región** (EEUU, NA o SUR; opcional).
 - Botón **Compartir por WhatsApp** en la ficha de la cuenta. El mensaje sale ordenado: "Cuenta FF NA", correo, contraseña y los códigos de 8 dígitos.
+
+## 24. Versión 3.7 — Una carpeta, una cuenta
+- Al crear una carpeta de **Cuentas FF** se abre directo el formulario de la cuenta (el nombre es opcional: usa el correo).
+- Cada carpeta guarda una sola cuenta; ya no hay "Añadir Cuenta". Para otra cuenta, crea otra carpeta con el +.
+- Se quitó el botón punteado "Añadir Carpeta" de la lista (queda el +).
+- Eliminar la cuenta elimina su carpeta. Una carpeta de cuenta vacía y abandonada se borra sola.

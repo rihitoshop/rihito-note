@@ -677,16 +677,16 @@ async function noteMenu(id, fromList) {
 
 /* ----- carpetas ----- */
 function viewFolders() {
+  S.folders = S.folders.filter(f => !(f.kind === 'accounts' && !f.accounts.length)); save();
   app.innerHTML = `<div class="screen">
     ${hdr('Carpetas', { back: '#/home', right: `<button class="iconbtn sq" data-act="new-folder" aria-label="Nueva carpeta">${ico('plus')}</button>` })}
     <div class="list">
       ${S.folders.map(f => `<div class="fcard" style="--c:${f.color}" data-go="#/folder/${f.id}">
         <div class="fico">${folderSvg}</div>
-        <div class="fmid"><b>${esc(f.name)}</b><small>${f.kind === 'accounts' ? plural(f.accounts.length, 'cuenta', 'cuentas') : plural(f.offers.length, 'oferta', 'ofertas')}</small></div>
+        <div class="fmid"><b>${esc(f.name)}</b><small>${f.kind === 'accounts' ? (f.accounts.length === 1 ? esc((f.accounts[0].region ? f.accounts[0].region + ' · ' : '') + 'Ganancia ' + (accProfit(f.accounts[0]) >= 0 ? '+' : '') + money(accProfit(f.accounts[0]), f.accounts[0].cur)) : plural(f.accounts.length, 'cuenta', 'cuentas')) : plural(f.offers.length, 'oferta', 'ofertas')}</small></div>
         ${f.emoji ? `<span class="emo">${esc(f.emoji)}</span>` : ''}
         <button class="dots" data-act="menu-folder" data-id="${f.id}" aria-label="Opciones">${dotsIco}</button>
       </div>`).join('') || '<div class="empty">No tienes carpetas.</div>'}
-      <button class="btn dashed" data-act="new-folder">${ico('plus')} Añadir Carpeta</button>
     </div>
   </div>${nav('folders')}`;
 }
@@ -717,6 +717,8 @@ const money = (n, c) => `${fmt(n)} ${c}`;
 const sumCur = (list, fn) => { const t = {}; list.forEach(a => { t[a.cur] = (t[a.cur] || 0) + fn(a); }); return Object.keys(t).map(c => money(t[c], c)).join(' · ') || '—'; };
 const accOf = (fid, aid) => { const f = folderOf(fid); return f && f.accounts ? f.accounts.find(x => x.id === aid) : null; };
 function viewAccounts(f) {
+  if (!f.accounts.length) { go(`#/accountform/${f.id}/new`, true); return; }
+  if (f.accounts.length === 1) { viewAccount(f.id, f.accounts[0].id, true); return; }
   app.innerHTML = `<div class="screen">
     ${hdr(`${f.emoji ? esc(f.emoji) + ' ' : ''}${esc(f.name)}`, { back: '#/folders', right: `<button class="iconbtn" data-act="menu-folder" data-id="${f.id}" aria-label="Opciones">${dotsIco}</button>` })}
     <div class="stats-box accsum">
@@ -730,18 +732,17 @@ function viewAccounts(f) {
         <div class="amid"><b>${a.region ? `<span class="rchip sm">${a.region}</span>` : ''}${esc(a.email || 'Sin correo')}</b><span>Compra ${money(a.buy, a.cur)} · Venta ${money(a.sell, a.cur)}</span><small>${a.codes.length ? a.codes.length + ' código' + (a.codes.length === 1 ? '' : 's') : 'Sin códigos'}</small></div>
         <div class="sp ${accProfit(a) >= 0 ? 'pos' : 'neg'}">${accProfit(a) >= 0 ? '+' : ''}${money(accProfit(a), a.cur)}</div>
       </div>`).join('')}
-      <button class="btn dashed" data-act="add-account" data-f="${f.id}">${ico('plus')} Añadir Cuenta</button>
     </div>
   </div>${nav('folders')}`;
 }
-function viewAccount(fid, aid) {
+function viewAccount(fid, aid, single) {
   const f = folderOf(fid), a = accOf(fid, aid);
   if (!a) { go(f ? '#/folder/' + fid : '#/folders', true); return; }
   const show = flash; flash = null;
   const row = (lbl, val, btns = '') => `<div class="crow"><div class="cx"><small>${lbl}</small><span>${val}</span></div>${btns}</div>`;
   const cbtn = (w, ic = 'copy', lbl = 'Copiar') => `<button class="cbtn" data-act="acc-copy" data-f="${fid}" data-id="${aid}" data-w="${w}" aria-label="${lbl}">${ico(ic)}</button>`;
   app.innerHTML = `<div class="screen">
-    ${hdr('Cuenta FF', { back: '#/folder/' + fid })}
+    ${hdr(single ? `${f.emoji ? esc(f.emoji) + ' ' : ''}${esc(f.name)}` : 'Cuenta FF', single ? { back: '#/folders', right: `<button class="iconbtn" data-act="menu-folder" data-id="${f.id}" aria-label="Opciones">${dotsIco}</button>` } : { back: '#/folder/' + fid })}
     <div class="panel accbox">
       ${a.region ? row('Región', `<span class="rchip">${a.region}</span>`) : ''}
       ${row('Correo electrónico', esc(a.email || '—'), a.email ? cbtn('email') : '')}
@@ -770,9 +771,9 @@ function viewAccountForm(fid, aid) {
   const a = aid === 'new' ? null : accOf(fid, aid);
   if (aid !== 'new' && !a) { go('#/folder/' + fid, true); return; }
   let cur = a ? a.cur : CURS[0], region = a ? a.region || '' : '';
-  const back = a ? `#/account/${fid}/${aid}` : '#/folder/' + fid;
+  const back = a ? (f.accounts.length === 1 ? '#/folder/' + fid : `#/account/${fid}/${aid}`) : (f.accounts.length ? '#/folder/' + fid : '#/folders');
   app.innerHTML = `<div class="screen nonav">
-    ${hdr(a ? 'Editar Cuenta' : 'Añadir Cuenta', { back, lead: ico('mail') })}
+    ${hdr(a ? 'Editar Cuenta' : 'Nueva Cuenta FF', { back, lead: ico('mail') })}
     <form class="panel" id="af" autocomplete="off" novalidate>
       <div class="field"><label>Región</label><div class="seg" id="areg">${REGIONS.map(r => `<button type="button" data-r="${r}" class="${a && a.region === r ? 'on' : ''}">${r}</button>`).join('')}</div></div>
       <div class="field"><label for="ae">Correo electrónico</label><input class="input" id="ae" type="text" inputmode="email" autocapitalize="off" maxlength="120" placeholder="correo@gmail.com" value="${esc(a ? a.email : '')}"></div>
@@ -812,9 +813,10 @@ function viewAccountForm(fid, aid) {
     const data = { email, pass: g('ap').value, codes: cs.slice(0, 30), cur, region, buy: B, sell: Sv, notes: g('an').value.trim() };
     let id;
     if (a) { Object.assign(a, data); id = a.id; } else { id = uid(); f.accounts.push({ id, ...data, created: Date.now() }); }
-    if (save()) { flash = true; go(`#/account/${fid}/${id}`, true); }
+    if (f.autoName) { f.name = email; delete f.autoName; }
+    if (save()) { flash = true; go(f.accounts.length === 1 ? '#/folder/' + fid : `#/account/${fid}/${id}`, true); }
   });
-  setTimeout(() => g('ae').focus(), 60);
+  setTimeout(() => { const e = $('#ae'); e && e.focus(); }, 60);
 }
 const accountText = a => `*Cuenta FF${a.region ? ' ' + a.region : ''}*\n\n📧 Correo:\n${a.email || '—'}\n\n🔑 Contraseña:\n${a.pass || '—'}${a.codes.length ? `\n\n🔢 Códigos de 8 dígitos:\n${a.codes.join('\n')}` : ''}`;
 function copyText(t) {
@@ -1201,7 +1203,7 @@ function viewProfile() {
       ${getAuth() && fpSupported() ? row('fp-toggle', 'finger', 'Entrar con huella', getFp() ? 'Activada' : 'Desactivada') : ''}
       ${getAuth() ? row('lock', 'lock', 'Bloquear ahora', 'Se bloquea sola tras 1 minuto en segundo plano') : ''}
     </div>
-    <div class="info" style="text-align:center;margin-top:16px;font-size:12px">RIHITO NOTES · versión 3.6</div>
+    <div class="info" style="text-align:center;margin-top:16px;font-size:12px">RIHITO NOTES · versión 3.7</div>
   </div>${nav('profile')}`;
 }
 
@@ -1250,12 +1252,12 @@ async function folderDialog(f) {
     if (fk) fk.addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b) return; kind = b.dataset.k;
       fk.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
-      $('#fn', ov).placeholder = kind === 'accounts' ? 'Ej: Cuentas FF' : 'Ej: Diamantes Free Fire';
+      $('#fn', ov).placeholder = kind === 'accounts' ? 'Opcional (si no, usa el correo)' : 'Ej: Diamantes Free Fire';
     });
     $('#fc', ov).addEventListener('click', e => { const b = e.target.closest('button'); if (b) { color = b.dataset.c; paint(); } });
     $('#fok', ov).addEventListener('click', () => {
       const name = $('#fn', ov).value.trim();
-      if (!name) { toast('Escribe un nombre', true); return; }
+      if (!name && kind !== 'accounts') { toast('Escribe un nombre', true); return; }
       close({ name, emoji: $('#fe', ov).value.trim(), color, kind });
     });
     setTimeout(() => $('#fn', ov).focus(), 60);
@@ -1337,7 +1339,7 @@ document.addEventListener('click', async e => {
     case 'add-account': go(`#/accountform/${fid}/new`); break;
     case 'edit-account': go(`#/accountform/${fid}/${id}`); break;
     case 'del-account': { const f = folderOf(fid), a = accOf(fid, id); if (!a) break;
-      if (await confirmBox('Eliminar cuenta', `¿Eliminar la cuenta ${a.email || ''}?`, 'Eliminar')) { f.accounts = f.accounts.filter(x => x.id !== id); save(); toast('Cuenta eliminada'); go('#/folder/' + fid, true); } break; }
+      if (await confirmBox('Eliminar cuenta', `¿Eliminar la cuenta ${a.email || ''}${f.accounts.length === 1 ? ' y su carpeta' : ''}?`, 'Eliminar')) { f.accounts = f.accounts.filter(x => x.id !== id); if (!f.accounts.length) S.folders = S.folders.filter(x => x.id !== fid); save(); toast('Cuenta eliminada'); go(f.accounts.length ? '#/folder/' + fid : '#/folders', true); } break; }
     case 'acc-share': { const a = accOf(fid, id); if (a) shareWhatsApp(accountText(a)); break; }
     case 'acc-eye': { const a = accOf(fid, id), sp = $('#pwv'); if (!a || !sp) break; const on = sp.dataset.shown === '1'; sp.dataset.shown = on ? '0' : '1'; sp.textContent = on ? '••••••••' : a.pass; el.innerHTML = ico(on ? 'eye' : 'eyeoff'); break; }
     case 'acc-copy': { const a = accOf(fid, id); if (!a) break; const w = el.dataset.w;
@@ -1385,6 +1387,7 @@ document.addEventListener('click', async e => {
 async function newFolder() {
   const r = await folderDialog(null); if (!r) return;
   const f = { id: uid(), name: r.name, emoji: r.emoji, color: r.color, created: Date.now(), kind: r.kind === 'accounts' ? 'accounts' : 'offers', offers: [], accounts: [] };
+  if (f.kind === 'accounts') { f.autoName = !f.name; f.name = f.name || 'Cuenta FF'; S.folders.push(f); save(); go('#/accountform/' + f.id + '/new'); return; }
   S.folders.push(f); save(); toast('Carpeta creada ✓'); go('#/folder/' + f.id);
 }
 function lockApp() { if (!getAuth()) return; unlocked = false; history.replaceState(null, '', '#/home'); route(); }
