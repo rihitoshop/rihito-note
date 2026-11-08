@@ -198,3 +198,7 @@ No pude generar un APK desde aquí (no hay herramientas de Android disponibles e
 - Cada cuenta guarda correo, contraseña, códigos de 8 dígitos, moneda (CUP, SM, $), precio de compra, precio de venta y ganancia (se calcula sola). Botones para copiar cada dato.
 - Resumen de la carpeta: cuentas guardadas, invertido y ganancia total por moneda.
 - Las contraseñas se guardan en el teléfono sin cifrar, igual que las notas.
+
+## 23. Versión 3.6
+- Cada cuenta FF tiene **Región** (EEUU, NA o SUR; opcional).
+- Botón **Compartir por WhatsApp** en la ficha de la cuenta. El mensaje sale ordenado: "Cuenta FF NA", correo, contraseña y los códigos de 8 dígitos.

@@ -39,6 +39,7 @@ const ACCENTS = ['#a855f7', '#38bdf8', '#4ade80', '#fbbf24', '#f472b6'];
 const FCOLORS = ['#38bdf8', '#8b5cf6', '#4ade80', '#fb923c', '#f472b6', '#facc15'];
 const DEF_BG = '#160c2b', DEF_FG = '#f4ecff';
 const CURS = ['CUP', 'SM', '$'];
+const REGIONS = ['EEUU', 'NA', 'SUR'];
 const cleanLines = a => (Array.isArray(a) ? a : []).filter(l => l && typeof l === 'object').slice(0, 1000).map(l => ({ d: String(l.d || '').slice(0, 500), n: String(l.n || '').replace(/[^0-9.,\-]/g, '').slice(0, 30), c: CURS.includes(l.c) ? l.c : 'CUP' }));
 const AC_SW = ['#a855f7', '#38bdf8', '#4ade80', '#fbbf24', '#f472b6', '#ef4444', '#f97316', '#ffffff'];
 /* ----- temas de color: --hue / --sat / --lum (el CSS deriva todos los morados de ahí) ----- */
@@ -164,7 +165,7 @@ function normalize(d) {
       accounts: (Array.isArray(f.accounts) ? f.accounts : []).slice(0, 5000).filter(a => a && typeof a === 'object').map(a => ({
         id: String(a.id || uid()), email: String(a.email || '').slice(0, 120), pass: String(a.pass || '').slice(0, 120),
         codes: (Array.isArray(a.codes) ? a.codes : []).map(c => String(c).replace(/\D/g, '')).filter(c => c.length === 8).slice(0, 30),
-        cur: CURS.includes(a.cur) ? a.cur : CURS[0], buy: Number.isFinite(+a.buy) ? +a.buy : 0, sell: Number.isFinite(+a.sell) ? +a.sell : 0,
+        cur: CURS.includes(a.cur) ? a.cur : CURS[0], region: REGIONS.includes(a.region) ? a.region : '', buy: Number.isFinite(+a.buy) ? +a.buy : 0, sell: Number.isFinite(+a.sell) ? +a.sell : 0,
         notes: String(a.notes || '').slice(0, 5000), created: Number(a.created) || Date.now()
       })),
       offers: (Array.isArray(f.offers) ? f.offers : []).filter(o => o && typeof o === 'object').map(o => ({
@@ -726,7 +727,7 @@ function viewAccounts(f) {
     <div class="list">
       ${f.accounts.map(a => `<div class="acard" data-go="#/account/${f.id}/${a.id}">
         <div class="aico">${ico('mail')}</div>
-        <div class="amid"><b>${esc(a.email || 'Sin correo')}</b><span>Compra ${money(a.buy, a.cur)} · Venta ${money(a.sell, a.cur)}</span><small>${a.codes.length ? a.codes.length + ' código' + (a.codes.length === 1 ? '' : 's') : 'Sin códigos'}</small></div>
+        <div class="amid"><b>${a.region ? `<span class="rchip sm">${a.region}</span>` : ''}${esc(a.email || 'Sin correo')}</b><span>Compra ${money(a.buy, a.cur)} · Venta ${money(a.sell, a.cur)}</span><small>${a.codes.length ? a.codes.length + ' código' + (a.codes.length === 1 ? '' : 's') : 'Sin códigos'}</small></div>
         <div class="sp ${accProfit(a) >= 0 ? 'pos' : 'neg'}">${accProfit(a) >= 0 ? '+' : ''}${money(accProfit(a), a.cur)}</div>
       </div>`).join('')}
       <button class="btn dashed" data-act="add-account" data-f="${f.id}">${ico('plus')} Añadir Cuenta</button>
@@ -742,6 +743,7 @@ function viewAccount(fid, aid) {
   app.innerHTML = `<div class="screen">
     ${hdr('Cuenta FF', { back: '#/folder/' + fid })}
     <div class="panel accbox">
+      ${a.region ? row('Región', `<span class="rchip">${a.region}</span>`) : ''}
       ${row('Correo electrónico', esc(a.email || '—'), a.email ? cbtn('email') : '')}
       ${row('Contraseña', `<span id="pwv" data-shown="0">${a.pass ? '••••••••' : '—'}</span>`, a.pass ? `<button class="cbtn" data-act="acc-eye" data-f="${fid}" data-id="${aid}" aria-label="Mostrar contraseña">${ico('eye')}</button>${cbtn('pass')}` : '')}
       <div class="crow col"><div class="cx"><small>Códigos de 8 dígitos${a.codes.length ? ' (toca uno para copiarlo)' : ''}</small></div>
@@ -755,7 +757,8 @@ function viewAccount(fid, aid) {
       <div class="r"><span class="lead" style="color:#22c55e">${ico('trend')}</span><span class="lbl">Ganancia:</span><span class="val ${accProfit(a) >= 0 ? 'pos' : 'neg'}">${accProfit(a) >= 0 ? '+' : ''}${money(accProfit(a), a.cur)}</span></div>
     </div>
     ${a.notes ? `<div class="notes-box"><h4>Notas</h4>${esc(a.notes)}</div>` : ''}
-    <div class="row" style="margin-top:14px">
+    <button class="btn wa" data-act="acc-share" data-f="${fid}" data-id="${aid}" style="margin-top:14px">${ico('chat')} Compartir por WhatsApp</button>
+    <div class="row" style="margin-top:10px">
       <button class="btn" data-act="edit-account" data-f="${fid}" data-id="${aid}">${ico('pencil')} Editar</button>
       <button class="btn danger" data-act="del-account" data-f="${fid}" data-id="${aid}">${ico('trash')} Eliminar</button>
     </div>
@@ -766,11 +769,12 @@ function viewAccountForm(fid, aid) {
   const f = folderOf(fid); if (!f || f.kind !== 'accounts') { go('#/folders', true); return; }
   const a = aid === 'new' ? null : accOf(fid, aid);
   if (aid !== 'new' && !a) { go('#/folder/' + fid, true); return; }
-  let cur = a ? a.cur : CURS[0];
+  let cur = a ? a.cur : CURS[0], region = a ? a.region || '' : '';
   const back = a ? `#/account/${fid}/${aid}` : '#/folder/' + fid;
   app.innerHTML = `<div class="screen nonav">
     ${hdr(a ? 'Editar Cuenta' : 'Añadir Cuenta', { back, lead: ico('mail') })}
     <form class="panel" id="af" autocomplete="off" novalidate>
+      <div class="field"><label>Región</label><div class="seg" id="areg">${REGIONS.map(r => `<button type="button" data-r="${r}" class="${a && a.region === r ? 'on' : ''}">${r}</button>`).join('')}</div></div>
       <div class="field"><label for="ae">Correo electrónico</label><input class="input" id="ae" type="text" inputmode="email" autocapitalize="off" maxlength="120" placeholder="correo@gmail.com" value="${esc(a ? a.email : '')}"></div>
       <div class="field"><label for="ap">Contraseña</label>${pwInput('ap', 'Contraseña de la cuenta', 'off')}</div>
       <div class="field"><label for="ac">Códigos de 8 dígitos</label><textarea class="input" id="ac" inputmode="numeric" placeholder="Uno por línea o separados por espacio&#10;12345678&#10;87654321">${esc(a ? a.codes.join('\n') : '')}</textarea><div class="status" id="acn" style="text-align:left"></div></div>
@@ -795,6 +799,7 @@ function viewAccountForm(fid, aid) {
     g('acn').textContent = cs.length ? `${cs.length - bad} código(s) válido(s)${bad ? ` · ${bad} sin 8 dígitos` : ''}` : '';
   };
   ['ab', 'as', 'ac'].forEach(i => g(i).addEventListener('input', upd));
+  g('areg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; region = region === b.dataset.r ? '' : b.dataset.r; g('areg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.r === region)); });
   g('acur').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; cur = b.dataset.c; g('acur').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); upd(); });
   upd();
   g('af').addEventListener('submit', e => {
@@ -804,13 +809,14 @@ function viewAccountForm(fid, aid) {
     if (cs.some(c => !/^\d{8}$/.test(c))) { toast('Cada código debe tener exactamente 8 números', true); g('ac').focus(); return; }
     if (Number.isNaN(B) || B < 0) { toast('Precio de compra no válido', true); g('ab').focus(); return; }
     if (Number.isNaN(Sv) || Sv < 0) { toast('Precio de venta no válido', true); g('as').focus(); return; }
-    const data = { email, pass: g('ap').value, codes: cs.slice(0, 30), cur, buy: B, sell: Sv, notes: g('an').value.trim() };
+    const data = { email, pass: g('ap').value, codes: cs.slice(0, 30), cur, region, buy: B, sell: Sv, notes: g('an').value.trim() };
     let id;
     if (a) { Object.assign(a, data); id = a.id; } else { id = uid(); f.accounts.push({ id, ...data, created: Date.now() }); }
     if (save()) { flash = true; go(`#/account/${fid}/${id}`, true); }
   });
   setTimeout(() => g('ae').focus(), 60);
 }
+const accountText = a => `*Cuenta FF${a.region ? ' ' + a.region : ''}*\n\n📧 Correo:\n${a.email || '—'}\n\n🔑 Contraseña:\n${a.pass || '—'}${a.codes.length ? `\n\n🔢 Códigos de 8 dígitos:\n${a.codes.join('\n')}` : ''}`;
 function copyText(t) {
   const done = () => toast('Copiado ✓');
   if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(t).then(done, () => toast('No se pudo copiar', true)); return; }
@@ -1195,7 +1201,7 @@ function viewProfile() {
       ${getAuth() && fpSupported() ? row('fp-toggle', 'finger', 'Entrar con huella', getFp() ? 'Activada' : 'Desactivada') : ''}
       ${getAuth() ? row('lock', 'lock', 'Bloquear ahora', 'Se bloquea sola tras 1 minuto en segundo plano') : ''}
     </div>
-    <div class="info" style="text-align:center;margin-top:16px;font-size:12px">RIHITO NOTES · versión 3.5</div>
+    <div class="info" style="text-align:center;margin-top:16px;font-size:12px">RIHITO NOTES · versión 3.6</div>
   </div>${nav('profile')}`;
 }
 
@@ -1332,6 +1338,7 @@ document.addEventListener('click', async e => {
     case 'edit-account': go(`#/accountform/${fid}/${id}`); break;
     case 'del-account': { const f = folderOf(fid), a = accOf(fid, id); if (!a) break;
       if (await confirmBox('Eliminar cuenta', `¿Eliminar la cuenta ${a.email || ''}?`, 'Eliminar')) { f.accounts = f.accounts.filter(x => x.id !== id); save(); toast('Cuenta eliminada'); go('#/folder/' + fid, true); } break; }
+    case 'acc-share': { const a = accOf(fid, id); if (a) shareWhatsApp(accountText(a)); break; }
     case 'acc-eye': { const a = accOf(fid, id), sp = $('#pwv'); if (!a || !sp) break; const on = sp.dataset.shown === '1'; sp.dataset.shown = on ? '0' : '1'; sp.textContent = on ? '••••••••' : a.pass; el.innerHTML = ico(on ? 'eye' : 'eyeoff'); break; }
     case 'acc-copy': { const a = accOf(fid, id); if (!a) break; const w = el.dataset.w;
       copyText(w === 'email' ? a.email : w === 'pass' ? a.pass : w === 'codes' ? a.codes.join('\n') : a.codes[+w.slice(1)] || ''); break; }
